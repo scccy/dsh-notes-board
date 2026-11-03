@@ -174,5 +174,15 @@ probe('抽屉-备选', 'dr-body-alt', '始终合并各角色')
 probe('抽屉-代价', 'dr-body-consequences', '零破坏')
 console.log('抽屉标题:', byId('dr-headline').textContent)
 console.log('抽屉血缘:', (byId('dr-lineage-stream').innerHTML || '').length, 'B')
+
+// KPI 卡片：原版用内联 onclick 调 routeToListFilter，收进 factory 闭包后点击必抛
+// ReferenceError。现在改成 data-kpi-filter + 事件委托，这里模拟一次点击看筛选是否生效。
+clickHandler({
+  target: { closest: (sel) => (sel === '[data-kpi-filter]' ? { getAttribute: () => 'rejected' } : null) },
+})
+const kpiHtml = byId('matrix-rows-stream').innerHTML || ''
+const kpiOk = kpiHtml.includes('用 iframe 复用原版看板') && !kpiHtml.includes('能力 seam')
+console.log(`  ${kpiOk ? 'ok  ' : 'MISS'} KPI 点击 → 决策清单只剩「否决」项（${kpiHtml.length}B）`)
+
 board.dispose()
 console.log('dispose ok')

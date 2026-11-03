@@ -345,7 +345,7 @@ function renderBaseline() {
   ];
 
   byId('kpi-row').innerHTML = kpis.map(k => `
-    <div class="kpi-instrument" onclick="routeToListFilter('${escapeHtml(k.filter)}')">
+    <div class="kpi-instrument" data-kpi-filter="${escapeHtml(k.filter)}">
       <div class="kpi-tag">
         <span>${escapeHtml(k.label)}</span>
         <span style="width:6px;height:6px;border-radius:50%;background:${k.color}"></span>
@@ -890,6 +890,12 @@ async function startMission() {
   });
 
   onRoot('click', e => {
+    const kpiTrigger = e.target.closest('[data-kpi-filter]');
+    if (kpiTrigger) {
+      const kpiFilter = kpiTrigger.getAttribute('data-kpi-filter');
+      if (kpiFilter) routeToListFilter(kpiFilter);
+      return;
+    }
     const nodeTrigger = e.target.closest('[data-node-id]');
     if (nodeTrigger) {
       const id = nodeTrigger.getAttribute('data-node-id');

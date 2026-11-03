@@ -122,6 +122,39 @@ code = replaceCounted(
   '切换 tab 时补渲染',
 )
 
+// KPI 卡片：原版是内联 onclick="routeToListFilter(...)"。内联处理器在「全局作用域」求值，
+// 而改造后所有原版函数都收进了 factory 闭包 → 每点一次必抛 ReferenceError: routeToListFilter is not defined。
+// 机械补丁：标记换成 data-kpi-filter，点击交给下面那段已有的 root 委托监听。
+code = replaceCounted(
+  code,
+  '<div class="kpi-instrument" onclick="routeToListFilter(\'${escapeHtml(k.filter)}\')">',
+  '<div class="kpi-instrument" data-kpi-filter="${escapeHtml(k.filter)}">',
+  1,
+  'KPI 卡片内联 onclick → data-kpi-filter',
+)
+code = replaceCounted(
+  code,
+  `onRoot('click', e => {
+    const nodeTrigger = e.target.closest('[data-node-id]');`,
+  `onRoot('click', e => {
+    const kpiTrigger = e.target.closest('[data-kpi-filter]');
+    if (kpiTrigger) {
+      const kpiFilter = kpiTrigger.getAttribute('data-kpi-filter');
+      if (kpiFilter) routeToListFilter(kpiFilter);
+      return;
+    }
+    const nodeTrigger = e.target.closest('[data-node-id]');`,
+  1,
+  'KPI 卡片点击委托',
+)
+
+// 兜底断言：内联事件处理器在全局作用域求值，而本文件所有函数都在 factory 闭包里，
+// 只要再出现一个就跟 routeToListFilter 一样必抛。上游新增一定要在这里被拦住。
+must(
+  !/\son(?:click|change|input|keydown|keyup|keypress|submit|load|focus|blur|mouseover|mouseout)\s*=/.test(code),
+  '注入脚本里仍有内联事件处理器，改造成模块闭包后会抛 ReferenceError，请用 data-属性 + 事件委托替代',
+)
+
 /* ── 4. 拼装 client.js ───────────────────────────────────── */
 
 let out = shell
