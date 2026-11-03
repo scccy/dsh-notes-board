@@ -1,0 +1,58 @@
+{
+  "name": "dsh-notes-board",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "笔记看板：把各个工作区 .agents/notes 的工程决策笔记渲染成 DeepSeek Harness 原生面板，四板块 + 抽屉五节，支持切换工作区。",
+  "license": "MIT",
+  "author": "scccy",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-notes",
+    "notes",
+    "decision-log"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scccy/dsh-notes-board.git"
+  },
+  "homepage": "https://github.com/scccy/dsh-notes-board#readme",
+  "bugs": {
+    "url": "https://github.com/scccy/dsh-notes-board/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "src/**",
+    "scripts/**",
+    "vendor/**",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "test": "node scripts/test-board.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

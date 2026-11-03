@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Notes Board",
+    "description": "Adds a Notes Board panel to the sidebar: pick a workspace and read its .agents/notes decision records through the original agent-notes-board UI — architecture baseline (in-degree pillars), evolution timeline, pitfalls, and decision list, plus the five-section detail drawer. The Host only supplies read-only note text."
+  }
+}
