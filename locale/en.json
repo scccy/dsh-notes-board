@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Notes Board",
-    "description": "Three things in one plugin: a Notes Board sidebar panel that renders each workspace's .agents/notes decision records (architecture baseline, evolution timeline, pitfalls, decision list, plus the five-section detail drawer); five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that forces every turn touching code to either write a note or explicitly skip; and the bundled write-notes-like-deepseek skill, mounted for the agent."
+    "title": "Engineering Decision Notes",
+    "description": "Records engineering decisions as Markdown: every non-trivial change leaves a note under .agents/notes carrying the problem, the decision, the rejected alternatives and the consequences, committed to git and reviewable like code. The plugin makes that happen: five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that requires a code-changing turn to write a note or explicitly skip, and the bundled write-notes-like-deepseek skill mounted for the agent. A Notes Board sidebar panel renders those notes; it is the browsing layer, not the point."
   }
 }

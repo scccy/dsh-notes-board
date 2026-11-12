@@ -1,28 +1,24 @@
-# dsh-notes-board · 笔记看板
+# dsh-notes-board · 工程决策笔记
 
-把各个工作区 `.agents/notes` 里的工程决策笔记，变成 DeepSeek Harness 左侧栏里的一个原生面板：切换工作区、四个板块浏览、抽屉看正文。
+像 DSH 记录自己的决定那样记录工程决策：每次非平凡改动，在 `.agents/notes/` 下留一篇 Markdown——问题是什么、决定怎么做、否掉了哪些备选、付出了什么代价。它进 git，可以 review、可以 revert、可以被下一个人 grep 到。
 
-同一个插件还带**笔记工具与钩子**：`note_search` / `note_read` / `note_write` / `note_verify` / `note_skip` 五个原生工具，加一个 `turn/end` 钩子——改过代码的轮次结束时，必须落一篇笔记或显式 skip。再带**随包的技能**：`write-notes-like-deepseek` 由插件自己挂给 agent，不用往 `~/.dsh/skills` 手工装。
+这个插件负责让「这件事真的发生」：
 
-界面直接跑 [write-notes-like-deepseek](https://github.com/czm15053/write-notes-like-deepseek) 的原版看板（`vendor/board.html` 是它的逐字快照），只是把数据来源从「浏览器选目录」换成了宿主注入——所以原版的引用入度、时间线切片、避坑智库、深链、快捷键一个都不少。
+- **一个 `turn/end` 钩子**：改过代码的轮次结束时，当场要求二选一——落一篇笔记，或显式 `note_skip` 记一句理由。
+- **五个原生工具**：搜旧决定、读全文、写（写前校验，不合法不落盘）、跑上游三个校验器、记账。
+- **随包的 `write-notes-like-deepseek` 技能**：由插件自己挂给 agent，不用往 `~/.dsh/skills` 手工装。
 
-<!-- 截图占位：欢迎 PR 补一张面板截图 -->
-<!-- ![screenshot](docs/screenshot.png) -->
+看板是**浏览层，不是本体**：同一批 Markdown，另外渲染成左侧栏的一个面板。没有面板，笔记照样写、照样 review；没有笔记，面板只是空壳。
 
-## 它长什么样
+## 一篇笔记长什么样
 
-左侧栏多一个「笔记看板」图标。点进去是：
+- 位置：`.agents/notes/{implemented,proposed,rejected,archived}/<class>/yyyy-mm-dd-topic.md`
+- 六类：`feature` `bug-fix` `simplification` `architecture` `process` `testing`
+- `implemented` 的正文骨架：`## Problem` → `## Decision` → `## Consequences` → `## Alternatives considered`
 
-- 顶部一条工作区下拉框 + 刷新按钮，切换工作区只换数据，不重建 DOM
-- **🏛️ 架构基线**：KPI 四宫格 + 系统承重墙（按笔记间交叉引用入度排序）+ 领域架构分类阵列
-- **⏱️ 演进时间线**：按月份 / 分类切片
-- **🛡️ 避坑智库**：被否决的提案单独聚焦，防重犯
-- **📋 决策清单**：状态 / 分类 / 排序筛选 + 全文搜索
-- 点任意一条，右侧抽屉按五节展开：背景与痛点 / 落地裁定事实 / 放弃的备选 / 收益与工程代价 / 因果与血缘链路
+三个校验器（tree / format / archived）由技能随包带来，`note_verify` 直接跑它们，规则只有一个源头。
 
-数据全部来自各工作区 `.agents/notes/{implemented,proposed,rejected,archived}/{class}/yyyy-mm-dd-topic.md`。
-
-## 另外两件：工具、钩子与技能
+## 钩子与工具：让记录真的发生
 
 为什么要有钩子：`write-notes-like-deepseek` 是 skill，属于「模型可能选、也可能不选」——触发不稳定，这不是写得好不好的问题，是形态问题。所以拆两层：
 
@@ -70,6 +66,22 @@ NEEDS_SLUG: title has no Latin characters to build a filename from; pass slug wi
 - 技能随包走：装插件即装技能，卸载即消失；升级时和 `note_verify` 用的三个校验器一起换，因为它们本来就是同一份目录，不会分叉。
 - `includeDefaultRoots: false`，这个 provider 只提供随包那一份，不重复索引 `~/.dsh/skills`。
 - 宿主没有这个包、或 `ctx.plugin` 不可用时静默跳过（只写一行 info 日志），面板与工具照常工作。
+
+## 看板：浏览层
+
+面板是次要的那一半——同一批 Markdown，另外渲染成左侧栏的一个面板。左侧栏多一个「笔记看板」图标，点进去是：
+
+- 顶部一条工作区下拉框 + 刷新按钮，切换工作区只换数据，不重建 DOM
+- **🏛️ 架构基线**：KPI 四宫格 + 系统承重墙（按笔记间交叉引用入度排序）+ 领域架构分类阵列
+- **⏱️ 演进时间线**：按月份 / 分类切片
+- **🛡️ 避坑智库**：被否决的提案单独聚焦，防重犯
+- **📋 决策清单**：状态 / 分类 / 排序筛选 + 全文搜索
+- 点任意一条，右侧抽屉按五节展开：背景与痛点 / 落地裁定事实 / 放弃的备选 / 收益与工程代价 / 因果与血缘链路
+
+数据全部来自各工作区 `.agents/notes/{implemented,proposed,rejected,archived}/{class}/yyyy-mm-dd-topic.md`，画在 [write-notes-like-deepseek](https://github.com/czm15053/write-notes-like-deepseek) 的原版看板上（`vendor/board.html` 是它的逐字快照），只是把数据来源从「浏览器选目录」换成了宿主注入——所以原版的引用入度、时间线切片、避坑智库、深链、快捷键一个都不少。
+
+<!-- 截图占位：欢迎 PR 补一张面板截图 -->
+<!-- ![screenshot](docs/screenshot.png) -->
 
 ## 安装
 
