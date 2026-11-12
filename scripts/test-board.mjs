@@ -1,9 +1,23 @@
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import vm from 'node:vm'
 
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'client.js')
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const SRC = resolve(ROOT, 'client.js')
+
+// 合并后仓库里有两份同源看板模板：构建源 vendor/board.html，和技能资产副本
+// vendor/write-notes-like-deepseek/skills/write-notes-like-deepseek/assets/agent-notes-board.html
+// （后者被上游 test-skill-install.mjs 的存在性断言依赖）。它们必须逐字一致，
+// 否则上游更新只换了一份，面板和技能产物就悄悄分叉了。
+const BUILD_SOURCE = resolve(ROOT, 'vendor', 'board.html')
+const SKILL_ASSET = resolve(ROOT, 'vendor', 'write-notes-like-deepseek', 'skills', 'write-notes-like-deepseek', 'assets', 'agent-notes-board.html')
+const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex')
+if (sha(BUILD_SOURCE) !== sha(SKILL_ASSET)) {
+  throw new Error(`vendor 里两份 agent-notes-board.html 不一致：${BUILD_SOURCE} vs ${SKILL_ASSET}`)
+}
+console.log('  ok   两份看板模板逐字一致（sha256 ' + sha(BUILD_SOURCE).slice(0, 12) + '…）')
 
 const cache = new Map()
 function makeEl(id) {

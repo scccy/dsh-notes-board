@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "笔记看板",
-    "description": "在左侧栏加一个「笔记看板」面板：切换工作区后，直接渲染该工作区 .agents/notes 的工程决策笔记——架构基线（引用入度承重墙）、演进时间线、避坑智库、决策清单四个板块，附带抽屉五节详情。界面即原版 agent-notes-board，数据改由宿主只读注入。"
+    "description": "一个插件两件事：左侧栏「笔记看板」面板渲染各工作区 .agents/notes 的工程决策笔记（架构基线、演进时间线、避坑智库、决策清单四板块 + 抽屉五节）；同时提供 note_search / note_read / note_write / note_verify / note_skip 五个原生工具与 turn/end 钩子，保证改了代码的轮次结束时必须落一篇笔记或显式 skip。另附 MCP 服务端（bin/agent-notes-mcp）。"
   }
 }

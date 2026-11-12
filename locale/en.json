@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Notes Board",
-    "description": "Adds a Notes Board panel to the sidebar: pick a workspace and read its .agents/notes decision records through the original agent-notes-board UI — architecture baseline (in-degree pillars), evolution timeline, pitfalls, and decision list, plus the five-section detail drawer. The Host only supplies read-only note text."
+    "description": "Two things in one plugin: a Notes Board sidebar panel that renders each workspace's .agents/notes decision records (architecture baseline, evolution timeline, pitfalls, decision list, plus the five-section detail drawer), and five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that forces every turn touching code to either write a note or explicitly skip. Ships an MCP server too (bin/agent-notes-mcp)."
   }
 }
