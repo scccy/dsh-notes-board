@@ -179,6 +179,8 @@ npx tsx .agents/skills/write-notes-like-deepseek/scripts/build-board.ts --init b
 
 安装到 `.claude/skills/` 或全局目录时，用实际 Skill 路径替换上述前缀。看板打包参数为 `--bundle <notes目录> <输出.html> "名字"`；参数与免疫规则见 `references/verification.md`。
 
+当本 Skill 装在 `node_modules` 下（例如作为 dsh-notes-board 插件随包分发的副本），**不要直接 `node scripts/*.ts`**：Node 禁止对 `node_modules` 里的 `.ts` 做类型剥离，会报 `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`。装了该插件时改用 `note_verify` 工具（它会先把脚本按内容哈希拷到系统临时目录再跑）；没有该工具时，先把 `scripts/` 整个目录拷到 `node_modules` 之外再执行。
+
 团队可将本 Skill 的 `templates/verify-notes.yml` 复制到宿主仓库 `.github/workflows/verify-notes.yml`，调整为实际安装路径，并将项目级 Skill 文件一起提交；模板在 Skill 目录内不会执行。可在 `CONTRIBUTING.md` / PR 模板加一句「重要改动必带一篇笔记」。
 
 ## References

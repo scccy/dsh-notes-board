@@ -59,6 +59,8 @@ NEEDS_SLUG: title has no Latin characters to build a filename from; pass slug wi
 
 `note_verify` 直接 shell out 跑上游三个脚本（tree / format / archived），**不重新实现规则**——规则只有一个源头，避免两套实现漂移。Node 24 能直跑 `.ts`，不需要 tsx。
 
+装成插件后这份脚本落在 `node_modules/dsh-notes-board/vendor/` 下，而 Node 明确拒绝对 `node_modules` 里的 `.ts` 做类型剥离（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`）。所以 `note_verify` 先把 `scripts/*.ts` 按内容哈希拷到系统临时目录再执行；仓库内开发或自定义 `AGENT_NOTES_SKILL_DIR` 时仍在原地跑，改脚本立刻生效。
+
 ### 技能从哪来
 
 `write-notes-like-deepseek` 不需要再装到 `~/.dsh/skills`：`src/host/skills.js` 用宿主自带的 `@deepseek-ai/dsh-skill-filesystem` 起一个独立 provider（`providerName: 'agent-notes'`），`bundledSkillDir` 指向 `vendor/write-notes-like-deepseek/skills`。
@@ -106,7 +108,7 @@ dsh plugin --profile web add dsh-notes-board
 
 | 键 | 默认 | 含义 |
 |---|---|---|
-| `root` | `''` | 笔记根所在工作区；空 = 代理工作目录，再退到 `process.cwd()` |
+| `root` | `''` | 强制笔记根；空 = 跟着**会话当前工作目录**（`workingDirectory` 服务，会话中途 cd 也跟着变），再退到 `session.header.cwd`、`AGENT_NOTES_ROOT`、`process.cwd()` |
 | `reminder.enabled` | `true` | 是否提醒 |
 | `reminder.wake` | `false` | 是否立刻唤醒代理 |
 | `reminder.maxPerSession` | `6` | 单会话提醒上限（是提醒，不是循环） |

@@ -115,12 +115,35 @@ export function applyNotes(ctx, config = {}) {
     readonlyRe = null
   }
 
-  const rootOf = (agent) =>
-    cfg.root ??
-    agent?.workingDirectory?.path ??
-    agent?.workingDirectory ??
-    process.env.AGENT_NOTES_ROOT ??
-    process.cwd()
+  /* 笔记根目录 = 会话自己的工作目录，不是宿主进程的 cwd。DSH 把每个会话的当前目录
+     放在 workingDirectory 服务里（ctx.get('workingDirectory').get(session)），
+     会话中途 cd 也会跟着变；取不到时退到 session.header.cwd。之前的实现只看
+     cfg.root / process.cwd()，于是插件的笔记被写进 ~/.dsh/profiles/<name>/.agents。 */
+  const sessionCwd = (session) => {
+    if (!session) return undefined
+    try {
+      const service = ctx.get?.('workingDirectory')
+      const dir = service?.get?.(session)
+      if (typeof dir === 'string' && dir) return dir
+    } catch {
+      // 服务在精简 profile 里可能不存在：静默走下面的兜底。
+    }
+    const header = session.header?.cwd
+    return typeof header === 'string' && header ? header : undefined
+  }
+
+  const rootOf = (agent) => {
+    if (cfg.root) return cfg.root
+    const session = agent?.session
+    const cwd = sessionCwd(session)
+    return (
+      cwd ??
+      session?.header?.cwd ??
+      (typeof agent?.workingDirectory?.path === 'string' ? agent.workingDirectory.path : undefined) ??
+      process.env.AGENT_NOTES_ROOT ??
+      process.cwd()
+    )
+  }
 
   const isCodeChange = (toolName, args) => {
     if (!cfg.codeTools.has(toolName)) return false
@@ -142,8 +165,11 @@ export function applyNotes(ctx, config = {}) {
           description: tool.description,
           parameters: toDshParameters(tool.parameters),
           output: OUTPUT,
-          async execute(args) {
-            const out = await tool.run(args ?? {}, { root: cfg.root })
+          /* exec.agent 是发起这次调用的 agent，rootOf 由它现查会话工作目录。
+             只传 cfg.root 会让 tools 落到 DSH 进程的 cwd（profile 目录），
+             把笔记写进 ~/.dsh/profiles/<name>/.agents/notes。 */
+          async execute(args, exec) {
+            const out = await tool.run(args ?? {}, { root: rootOf(exec?.agent) })
             return { text: out.text, ok: out.ok !== false, ...(out.path ? { path: out.path } : {}) }
           },
         }),

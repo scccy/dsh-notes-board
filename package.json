@@ -1,6 +1,6 @@
 {
   "name": "dsh-notes-board",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "工程决策笔记：把每次非平凡改动写成 .agents/notes 下的 Markdown（问题 / 决定 / 被否决的备选 / 后果），进 git、可像代码一样 review；提供 note_search/note_read/note_write/note_verify/note_skip 五个原生工具、让改过代码的轮次必须结账的 turn/end 钩子，以及随包分发的 write-notes-like-deepseek 技能。另附把这些笔记渲染成侧边栏看板的面板（浏览层，非本体）。",
   "license": "MIT",
@@ -46,9 +46,10 @@
   ],
   "scripts": {
     "build": "node scripts/build-client.mjs",
-    "test": "node scripts/test-board.mjs && node --import ./test/stubs/register.mjs test/dsh-plugin.mjs",
+    "test": "node scripts/test-board.mjs && node --import ./test/stubs/register.mjs test/dsh-plugin.mjs && node test/core-verify.mjs",
     "test:board": "node scripts/test-board.mjs",
-    "test:hooks": "node --import ./test/stubs/register.mjs test/dsh-plugin.mjs"
+    "test:hooks": "node --import ./test/stubs/register.mjs test/dsh-plugin.mjs",
+    "test:core": "node test/core-verify.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*",

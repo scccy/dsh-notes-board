@@ -4,8 +4,9 @@
  * when the end-of-turn reminder fires.
  * Run: node --import ./test/stubs/register.mjs test/dsh-plugin.mjs
  */
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 const results = []
 const check = (label, cond) => {
@@ -31,7 +32,12 @@ function makeCtx(available) {
         return () => {}
       },
     },
-    get: (name) => (name === 'workspaceRegistry' ? { list: () => [] } : undefined),
+    get: (name) => {
+      if (name === 'workspaceRegistry') return { list: () => [] }
+      // 会话当前目录服务：插件用它把笔记落到会话所在的仓库，而不是进程 cwd。
+      if (name === 'workingDirectory') return { get: (session) => session?.header?.cwd }
+      return undefined
+    },
     effect: (fn) => {
       const dispose = fn()
       return () => dispose?.()
@@ -158,6 +164,22 @@ check('profile without webServer still gets tools', toolsOnly.routes.length === 
 const webOnly = makeCtx(['webServer'])
 mod.apply(webOnly.ctx, {})
 check('profile without tools still gets board routes', webOnly.routes.length === 2 && webOnly.registered.length === 0)
+
+// I: 工具的根目录取自调用方 agent 的 workingDirectory，而不是宿主进程的 cwd
+const tmpRoot = mkdtempSync(join(tmpdir(), 'notes-board-agent-root-'))
+const wired = makeCtx(['webServer', 'tools'])
+mod.apply(wired.ctx, {})
+const skipTool = wired.registered.find((t) => t.name === 'note_skip')
+await skipTool.execute({ reason: 'root wiring test' }, { agent: { session: { header: { cwd: tmpRoot } } } })
+check(
+  'tool writes into the calling agent working directory',
+  existsSync(join(tmpRoot, '.agents', 'notes', '.skips.log')),
+)
+check(
+  'tool does not write into the host process cwd',
+  tmpRoot === process.cwd() || !existsSync(join(process.cwd(), '.agents', 'notes', '.skips.log')),
+)
+rmSync(tmpRoot, { recursive: true, force: true })
 
 const failed = results.filter((r) => !r.ok).length
 console.log(`\n${results.length - failed}/${results.length} passed`)

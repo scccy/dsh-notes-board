@@ -7,11 +7,23 @@
  *   lifecycle ∈ proposed | implemented | rejected (+ archived)
  *   class     ∈ feature | bug-fix | simplification | architecture | process | testing
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+  appendFileSync,
+  copyFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const PKG_ROOT = resolve(HERE, '..', '..')
@@ -432,6 +444,38 @@ const VERIFY_SCRIPTS = [
   'verify-archived-agent-notes.ts',
 ]
 
+/**
+ * Node refuses to strip TypeScript types for files under `node_modules`
+ * (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), and an installed plugin's
+ * vendored scripts always live there. Copy them to a content-addressed cache
+ * directory outside `node_modules` and run that copy instead. A repo checkout
+ * (or `AGENT_NOTES_SKILL_DIR`) keeps running in place, so edits take effect
+ * immediately. The copy is keyed by content, so an upgrade lands in a new
+ * directory instead of reusing stale sources.
+ */
+export function stageScripts(dir) {
+  if (!dir.split(sep).includes('node_modules')) return dir
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith('.ts'))
+    .sort()
+  if (files.length === 0) return dir
+  const hash = createHash('sha256')
+  for (const name of files) hash.update(name).update(readFileSync(join(dir, name)))
+  const target = join(tmpdir(), `dsh-notes-board-verify-${hash.digest('hex').slice(0, 16)}`)
+  if (existsSync(target)) return target
+  const staging = `${target}.tmp-${process.pid}`
+  rmSync(staging, { recursive: true, force: true })
+  mkdirSync(staging, { recursive: true })
+  for (const name of files) copyFileSync(join(dir, name), join(staging, name))
+  try {
+    renameSync(staging, target)
+  } catch {
+    // Another process won the race; its copy is identical (same content hash).
+    rmSync(staging, { recursive: true, force: true })
+  }
+  return target
+}
+
 function runScript(scriptPath, base) {
   return new Promise((done) => {
     execFile(
@@ -468,8 +512,9 @@ export async function runVerify(root) {
     return { ok: true, note: 'no .agents/notes yet — nothing to verify', results: [] }
   }
   const results = []
+  const staged = stageScripts(scripts)
   for (const name of VERIFY_SCRIPTS) {
-    const scriptPath = join(scripts, name)
+    const scriptPath = join(staged, name)
     if (!existsSync(scriptPath)) {
       results.push({ script: name, ok: false, code: 'MISSING_SCRIPT' })
       continue
