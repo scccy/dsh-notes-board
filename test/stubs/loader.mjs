@@ -4,6 +4,7 @@ const MAP = new Map([
   ['@deepseek-ai/dsh-tools', new URL('./dsh-tools.mjs', import.meta.url).href],
   ['@deepseek-ai/dsh-llm', new URL('./dsh-llm.mjs', import.meta.url).href],
   ['@deepseek-ai/schemastery', new URL('./schemastery.mjs', import.meta.url).href],
+  ['@deepseek-ai/dsh-skill-filesystem', new URL('./dsh-skill-filesystem.mjs', import.meta.url).href],
 ])
 export async function resolve(specifier, context, next) {
   const mapped = MAP.get(specifier)

@@ -25,7 +25,7 @@ export function apply(ctx, config = {}) {
 - 笔记半边：`src/dsh/index.js` → `src/host/notes.js`，`apply` → `applyNotes`，`Config` → `NotesConfig`；入口以 `export const Config = NotesConfig` 对外，`root` / `reminder.{enabled,wake,maxPerSession}` / `codeTools` / `readonlyCommandPattern` 保持原键名，旧配置能直接搬。
 - **`tools` 就绪判断留在 `applyNotes` 内部**（`ctx.inject(['tools'], mount)`），而 `agent/created` 与 `session/event` 监听挂在**插件自己的 ctx** 上：cordis 事件沿 scope 往上冒泡，监听器注册在 `ctx.inject` 给的子 scope 里就收不到外层发出的 `session/event`，钩子会静默永不触发（已装插件里 billion-context 听 `session/event` 用的也是外层 `ctx.on`）。测试用「子 scope 自己的 `on` 记账」这条断言把这个不变量钉住。
 - 相对路径深度两边都没变：`src/host/*` 到 `src/core/*` 仍是 `../core/*`，`src/core/notes.js` 的 `PKG_ROOT = resolve(HERE,'..','..')` 仍指仓库根，`skillScriptsDir()` 还找得到 `vendor/write-notes-like-deepseek/skills/write-notes-like-deepseek`。
-- MCP 依赖转正：`@modelcontextprotocol/sdk` + `zod` 进 `dependencies`（只有 `bin/agent-notes-mcp.js` 与 `src/mcp/server.js` 用）；三个宿主包 `@deepseek-ai/{dsh-tools,dsh-llm,schemastery}` 只声明为 optional `peerDependencies`——它们由运行中的 Harness 提供，不能进包依赖。
+- 宿主包 `@deepseek-ai/{dsh-tools,dsh-llm,schemastery}` 只声明为 optional `peerDependencies`——它们由运行中的 Harness 提供，不能进包依赖。（同日晚些时候 MCP 出口整块删除，`@modelcontextprotocol/sdk` + `zod` 两个 `dependencies` 随之消失，本包回到零运行时依赖，见 [移除 MCP 出口，技能改为随包挂载](../simplification/2026-11-12-drop-mcp-surface-mount-bundled-skill.md)。）
 - `engines.node` 取两边最大值 `>=22.18`；`cordis.patch.yml` 不动，仍是一条 row（package name / patch name / `client.js` 里 `__ModuleLoader__` 的 id 三者一致这条约束没变）。
 - `scripts/test-board.mjs` 增加一条 `sha256` 断言：`vendor/board.html` 与技能资产副本必须逐字一致，防止上游更新只换一份。
 

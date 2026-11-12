@@ -27,3 +27,5 @@ skill 与 MCP 工具的成功条件相同——都是模型主动选择，失败
 单会话最多提醒 `maxPerSession` 次（默认 6）；提醒默认不唤醒，避免额外 token。钩子判断是保守启发式（只读命令白名单 + 工具名白名单），会有漏判，需要模型自身判断补齐。
 
 本笔记原属 `dsh-agent-notes` 仓库，2026-11-12 合并进 `dsh-notes-board` 时整篇搬入，`src/dsh/index.js` 随之改名为 `src/host/notes.js`，判定逻辑未变。
+
+同日后续：文中"MCP 工具"那一层后来改用 DSH 原生 `ctx.tools.register` 提供，MCP 出口整块删除——"工具与钩子互补"这个结论不受影响，变的只是工具的承载形态，见 [移除 MCP 出口，技能改为随包挂载](../simplification/2026-11-12-drop-mcp-surface-mount-bundled-skill.md)。

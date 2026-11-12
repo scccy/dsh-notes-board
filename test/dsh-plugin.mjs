@@ -4,6 +4,9 @@
  * when the end-of-turn reminder fires.
  * Run: node --import ./test/stubs/register.mjs test/dsh-plugin.mjs
  */
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 const results = []
 const check = (label, cond) => {
   results.push({ label, ok: !!cond })
@@ -35,8 +38,15 @@ function makeCtx(available) {
     },
     logger: { info: () => {}, warn: () => {} },
   }
+  const plugins = []
   const ctx = {
     ...base,
+    // index.js mounts the bundled skill provider through ctx.plugin; record it so
+    // the test can assert the provider config without a real Harness.
+    plugin: (child, cfg) => {
+      plugins.push({ child, cfg })
+      return () => {}
+    },
     on: (type, cb) => {
       handlers.set(type, cb)
       return () => {}
@@ -53,10 +63,10 @@ function makeCtx(available) {
     })
     return () => {}
   }
-  return { ctx, registered, routes, handlers, subHandlers }
+  return { ctx, registered, routes, handlers, subHandlers, plugins }
 }
 
-const { ctx, registered, routes, handlers, subHandlers } = makeCtx(['webServer', 'tools'])
+const { ctx, registered, routes, handlers, subHandlers, plugins } = makeCtx(['webServer', 'tools'])
 mod.apply(ctx, {})
 
 check('entry declares no hard inject', mod.inject === undefined)
@@ -68,6 +78,12 @@ check('registers 5 tools', registered.length === 5)
 check('tool names are canonical', registered.map((t) => t.name).join(',') === 'note_search,note_read,note_write,note_verify,note_skip')
 check('tool has parameters DSL', registered[2].parameters.lifecycle.required === true)
 check('tool renders text', typeof registered[0].output.render === 'function')
+
+check('mounts the bundled skill provider', plugins.length === 1 && plugins[0].child?.name === 'dsh-skill-filesystem')
+check('skill provider is namespaced away from filesystem', plugins[0]?.cfg?.providerName === 'agent-notes')
+check('skill provider points at the vendored skills dir', /vendor\/write-notes-like-deepseek\/skills$/.test(plugins[0]?.cfg?.bundledSkillDir ?? ''))
+check('skill provider does not rescan default roots', plugins[0]?.cfg?.includeDefaultRoots === false && plugins[0]?.cfg?.watch === false)
+check('vendored skill has a SKILL.md the provider can index', existsSync(join(plugins[0]?.cfg?.bundledSkillDir ?? '', 'write-notes-like-deepseek', 'SKILL.md')))
 
 const injected = []
 let followed = 0

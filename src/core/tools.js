@@ -1,12 +1,12 @@
 /**
- * Canonical tool specs — one definition, two surfaces.
+ * Canonical tool specs — one definition, one surface.
  *
- * `src/mcp/server.js` adapts these to the MCP SDK (zod shapes);
- * `src/dsh/index.js` adapts them to the DeepSeek Harness tool DSL. Keeping the
- * descriptions here means both hosts give the model exactly the same contract,
- * so behavior cannot drift between "native plugin" and "MCP client".
+ * `src/host/notes.js` adapts these to the DeepSeek Harness tool DSL. Keeping the
+ * descriptions here means the tool contract lives in one place, so a later
+ * transport (or a second host) cannot drift from what the hook's reminder text
+ * tells the model to call.
  *
- * Parameter DSL (neutral subset, converted by each adapter):
+ * Parameter DSL (neutral subset, converted by the harness adapter):
  *   { type: 'string'|'boolean'|'integer', description, required?, enum?, default? }
  */
 import {

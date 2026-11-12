@@ -2,10 +2,10 @@
  * dsh-notes-board · 笔记半边的 Host 代码
  *
  * 由根 index.js 调用（applyNotes），不单独作为插件入口。
- * 提供与 MCP 面同一套 5 个原生工具，外加 turn/end 钩子，把"决定必须落库"变成
+ * 提供 5 个原生工具，外加 turn/end 钩子，把"决定必须落库"变成
  * 确定性约束。
  *
- * Why the hook exists: a skill and an MCP tool are both "the model may choose
+ * Why the hook exists: a skill and a tool are both "the model may choose
  * to use this". A hook runs whether or not the model feels like it, so the rule
  * "a non-mechanical change must end with note_write or note_skip" is enforced at
  * the point the turn closes, not hoped for at the point it starts.

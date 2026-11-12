@@ -1,8 +1,8 @@
 {
   "name": "dsh-notes-board",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "笔记看板：面板渲染各工作区 .agents/notes 的工程决策笔记（四板块 + 抽屉五节），同一插件还提供 note_search/note_read/note_write/note_verify/note_skip 五个原生工具、turn/end 钩子与 MCP 服务端。",
+  "description": "笔记看板：面板渲染各工作区 .agents/notes 的工程决策笔记（四板块 + 抽屉五节），同一插件还提供 note_search/note_read/note_write/note_verify/note_skip 五个原生工具、turn/end 钩子，以及随包的 write-notes-like-deepseek 技能。",
   "license": "MIT",
   "author": "scccy",
   "keywords": [
@@ -11,8 +11,7 @@
     "deepseek-harness",
     "agent-notes",
     "notes",
-    "decision-log",
-    "mcp"
+    "decision-log"
   ],
   "repository": {
     "type": "git",
@@ -28,13 +27,9 @@
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
-    "./mcp": "./src/mcp/server.js",
     "./core": "./src/core/notes.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
-  },
-  "bin": {
-    "agent-notes-mcp": "./bin/agent-notes-mcp.js"
   },
   "files": [
     "index.js",
@@ -42,7 +37,6 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "bin/**",
     "src/**",
     "scripts/**",
     "vendor/**",
@@ -52,24 +46,21 @@
   ],
   "scripts": {
     "build": "node scripts/build-client.mjs",
-    "test": "node scripts/test-board.mjs && node --import ./test/stubs/register.mjs test/dsh-plugin.mjs && node test/smoke.mjs",
+    "test": "node scripts/test-board.mjs && node --import ./test/stubs/register.mjs test/dsh-plugin.mjs",
     "test:board": "node scripts/test-board.mjs",
-    "test:hooks": "node --import ./test/stubs/register.mjs test/dsh-plugin.mjs",
-    "test:mcp": "node test/smoke.mjs",
-    "mcp": "node bin/agent-notes-mcp.js",
-    "mcp:http": "node bin/agent-notes-mcp.js --http"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    "zod": "^4.6.7"
+    "test:hooks": "node --import ./test/stubs/register.mjs test/dsh-plugin.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-skill-filesystem": "*",
     "@deepseek-ai/dsh-tools": "*",
     "@deepseek-ai/schemastery": "*"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-skill-filesystem": {
       "optional": true
     },
     "@deepseek-ai/dsh-tools": {

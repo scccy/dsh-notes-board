@@ -2,7 +2,7 @@
 
 把各个工作区 `.agents/notes` 里的工程决策笔记，变成 DeepSeek Harness 左侧栏里的一个原生面板：切换工作区、四个板块浏览、抽屉看正文。
 
-同一个插件还带**笔记工具与钩子**：`note_search` / `note_read` / `note_write` / `note_verify` / `note_skip` 五个原生工具，加一个 `turn/end` 钩子——改过代码的轮次结束时，必须落一篇笔记或显式 skip。另外附一个 MCP 服务端，把同一套工具给别的 MCP 宿主用。
+同一个插件还带**笔记工具与钩子**：`note_search` / `note_read` / `note_write` / `note_verify` / `note_skip` 五个原生工具，加一个 `turn/end` 钩子——改过代码的轮次结束时，必须落一篇笔记或显式 skip。再带**随包的技能**：`write-notes-like-deepseek` 由插件自己挂给 agent，不用往 `~/.dsh/skills` 手工装。
 
 界面直接跑 [write-notes-like-deepseek](https://github.com/czm15053/write-notes-like-deepseek) 的原版看板（`vendor/board.html` 是它的逐字快照），只是把数据来源从「浏览器选目录」换成了宿主注入——所以原版的引用入度、时间线切片、避坑智库、深链、快捷键一个都不少。
 
@@ -22,9 +22,9 @@
 
 数据全部来自各工作区 `.agents/notes/{implemented,proposed,rejected,archived}/{class}/yyyy-mm-dd-topic.md`。
 
-## 另一半：工具与钩子
+## 另外两件：工具、钩子与技能
 
-为什么要有钩子：`write-notes-like-deepseek` 是 skill。skill 和 MCP 工具都属于「模型可能选、也可能不选」，触发不稳定——这不是写得好不好的问题，是形态问题。所以拆两层：
+为什么要有钩子：`write-notes-like-deepseek` 是 skill，属于「模型可能选、也可能不选」——触发不稳定，这不是写得好不好的问题，是形态问题。所以拆两层：
 
 | 层 | 负责 | 形态 | 确定性 |
 |---|---|---|---|
@@ -63,6 +63,14 @@ NEEDS_SLUG: title has no Latin characters to build a filename from; pass slug wi
 
 `note_verify` 直接 shell out 跑上游三个脚本（tree / format / archived），**不重新实现规则**——规则只有一个源头，避免两套实现漂移。Node 24 能直跑 `.ts`，不需要 tsx。
 
+### 技能从哪来
+
+`write-notes-like-deepseek` 不需要再装到 `~/.dsh/skills`：`src/host/skills.js` 用宿主自带的 `@deepseek-ai/dsh-skill-filesystem` 起一个独立 provider（`providerName: 'agent-notes'`），`bundledSkillDir` 指向 `vendor/write-notes-like-deepseek/skills`。
+
+- 技能随包走：装插件即装技能，卸载即消失；升级时和 `note_verify` 用的三个校验器一起换，因为它们本来就是同一份目录，不会分叉。
+- `includeDefaultRoots: false`，这个 provider 只提供随包那一份，不重复索引 `~/.dsh/skills`。
+- 宿主没有这个包、或 `ctx.plugin` 不可用时静默跳过（只写一行 info 日志），面板与工具照常工作。
+
 ## 安装
 
 需要 DeepSeek Harness（DSH）。用 `dsh plugin` 装，`--profile` 换成本机 profile 名（常见的是 `web`）：
@@ -78,13 +86,7 @@ dsh plugin --profile web add dsh-notes-board
 
 > 面板是只读的：Host 侧只注册两条 GET 路由，不写任何文件，也不接受任意路径——只读 workspace registry 里登记过的工作区。写文件只发生在你（或代理）主动调用 `note_write` / `note_skip` 时。
 
-MCP 依赖会随包安装（`@modelcontextprotocol/sdk` + `zod`）。只想当 MCP 服务端用，不需要 DSH：
-
-```sh
-node bin/agent-notes-mcp.js                 # stdio，root = cwd
-node bin/agent-notes-mcp.js --http 8848     # stateless Streamable HTTP
-node bin/agent-notes-mcp.js --root /repo    # 指定工作区
-```
+本包**零运行时依赖**：`@deepseek-ai/dsh-tools`、`@deepseek-ai/dsh-llm`、`@deepseek-ai/schemastery`、`@deepseek-ai/dsh-skill-filesystem` 全部是可选 `peerDependencies`，由宿主提供。
 
 ## 配置
 
@@ -104,33 +106,37 @@ node bin/agent-notes-mcp.js --root /repo    # 指定工作区
 一个包、一条 loader row、一个 `apply`，入口只做组合：
 
 ```
-index.js  ← 组合层：ctx.inject(['webServer']) → applyBoard ；ctx.inject(['tools']) → applyNotes
+index.js  ← 组合层：ctx.inject(['webServer']) → applyBoard ；applyNotes ；mountNotesSkills
   │
   ├── src/host/board.js      看板半边（只读）
   │     GET /api/dsh-notes-board/workspaces
   │     GET /api/dsh-notes-board/scan
   │           └── 只回 .agents/notes 的 Markdown 原文（zh 优先去重、>64KB gzip）
   │
-  └── src/host/notes.js      笔记半边
-        ctx.tools.register × 5  +  ctx.on('session/event') 的 turn/end 钩子
-           │
-           ├── src/core/tools.js   5 个工具的唯一定义
-           └── src/core/notes.js   结构解析、校验、搜索、skip 账本、跑上游校验器
+  ├── src/host/notes.js      笔记半边
+  │     ctx.tools.register × 5  +  ctx.on('session/event') 的 turn/end 钩子
+  │        │
+  │        ├── src/core/tools.js   5 个工具的唯一定义
+  │        └── src/core/notes.js   结构解析、校验、搜索、skip 账本、跑上游校验器
+  │
+  └── src/host/skills.js     技能半边
+        ctx.plugin(dsh-skill-filesystem, {providerName:'agent-notes', bundledSkillDir: vendor/…/skills})
 ```
 
-- **两个半边各自 gate 自己的服务**。入口不导出 `inject`，所以缺 `webServer` 的 profile 里看板静默不激活、缺 `tools` 的 profile 里钩子静默不激活，谁都不会把整条插件行拖成加载失败。
+- **三个半边各自 gate 自己的服务**。入口不导出 `inject`，所以缺 `webServer` 的 profile 里看板静默不激活、缺 `tools` 的 profile 里钩子静默不激活、缺 `dsh-skill-filesystem` 的宿主里技能静默跳过，谁都不会把整条插件行拖成加载失败。
 - **Host 不解析笔记**。它只列出工作区、读原文、按相对路径返回。分类、引用入度、四个视图全部交给原版 `parseNote` / `ingestDataset`，解析逻辑只有一份。
 - **Client 不重写 UI**。`scripts/build-client.mjs` 把 `vendor/board.html` 做机械改造后拼进 `client.js`：`:root` → `:host`（挂 shadow root 做样式隔离）、`document.getElementById` → 作用域内 `byId()`、`location.hash` → 面板内自持路由、摘掉「浏览器目录授权」启动块改由 `ingestFiles()` 喂数据、四个视图改成按 tab 懒渲染。每个补丁都带数量断言，上游模板一变，构建直接失败而不是静默错改。
-- **MCP 与 DSH 共用一套工具定义**。`src/core/tools.js` 只有一份，`src/host/notes.js` 和 `src/mcp/server.js` 各适配一层。
+- **只有一条出口**。`src/core/tools.js` 是 5 个工具的唯一定义，`src/host/notes.js` 是唯一适配层；`note_verify` 与技能 provider 指的都是 `vendor/write-notes-like-deepseek` 那一份，规则不存在第二处副本。
 
 ### 开发
 
 ```sh
-npm install     # 装 MCP 依赖（@modelcontextprotocol/sdk + zod）
 npm run build   # src/panel.js + vendor/board.html -> client.js（生成物，别手改）
-npm test        # 三件套：桩 DOM 跑四视图 + 抽屉五节；入口/钩子 19 条用例；MCP stdio 端到端
-npm run test:board / test:hooks / test:mcp   # 单独跑
+npm test        # 两件套：桩 DOM 跑四视图 + 抽屉五节；入口/钩子/技能 25 条用例
+npm run test:board / test:hooks   # 单独跑
 ```
+
+没有运行时依赖，**不需要 `npm install`**；宿主包全部靠测试里的 `node --import ./test/stubs/register.mjs` 短路成 stub。
 
 改界面：改 `src/panel.js`（宿主壳）或 `scripts/build-client.mjs`（补丁表）。
 上游更新：替换 `vendor/board.html`，重跑 `npm run build`，按断言失败处修补丁。仓库里另有一份同源的技能资产副本 `vendor/write-notes-like-deepseek/skills/write-notes-like-deepseek/assets/agent-notes-board.html`，`npm test` 会断言两份 sha256 一致，防止只换一份导致分叉。
@@ -143,11 +149,10 @@ client.js           客户端生成物（别手改）
 src/panel.js        客户端源：React 薄壳 + shadow root 装原版看板
 src/host/board.js   看板半边：两条只读路由
 src/host/notes.js   笔记半边：5 个原生工具 + turn/end 钩子
+src/host/skills.js  技能半边：把随包技能挂成 agent 技能
 src/core/notes.js   结构解析、校验、搜索、skip 账本、跑上游校验器
-src/core/tools.js   5 个工具的唯一定义（两个面共用）
-src/mcp/server.js   MCP 适配（stdio + stateless HTTP）
-bin/                MCP CLI
-test/               入口与钩子测试、MCP 冒烟、宿主 stub
+src/core/tools.js   5 个工具的唯一定义
+test/               入口 / 钩子 / 技能挂载测试、宿主 stub
 vendor/             看板模板快照 + 上游 skill 源码（含三个校验脚本）
 ```
 
@@ -156,4 +161,4 @@ vendor/             看板模板快照 + 上游 skill 源码（含三个校验�
 - 本仓库代码：MIT，见 [LICENSE](LICENSE)。
 - `vendor/board.html`（看板模板本体）来自 [czm15053/write-notes-like-deepseek](https://github.com/czm15053/write-notes-like-deepseek)，其生成的页面内自述「遵循 MIT 协议开源」。原样收录、未改动语义，只在构建期做上述机械改造。详见 [NOTICE.md](NOTICE.md)。
 - `vendor/write-notes-like-deepseek`（技能源码与校验脚本）clone 自同一上游，保留 `skills/`（SKILL.md、references、templates、7 个脚本）与 README、package.json；原仓库的 `assets/`（22 张 5 MB 配图）、`.github/` 已裁掉，不影响校验。
-- 工具 / 钩子 / MCP 半边原为独立包 `dsh-agent-notes`（同一作者），2026-11-12 并入本仓库，决策记录见 `.agents/notes/implemented/architecture/2026-11-12-merge-notes-hook-into-notes-board.md`。
+- 工具 / 钩子 / 技能半边原为独立包 `dsh-agent-notes`（同一作者），2026-11-12 并入本仓库，决策记录见 `.agents/notes/implemented/architecture/2026-11-12-merge-notes-hook-into-notes-board.md`；同日移除 MCP 出口并把技能改为随包挂载，见 `.agents/notes/implemented/simplification/2026-11-12-drop-mcp-surface-mount-bundled-skill.md`。

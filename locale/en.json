@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Notes Board",
-    "description": "Two things in one plugin: a Notes Board sidebar panel that renders each workspace's .agents/notes decision records (architecture baseline, evolution timeline, pitfalls, decision list, plus the five-section detail drawer), and five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that forces every turn touching code to either write a note or explicitly skip. Ships an MCP server too (bin/agent-notes-mcp)."
+    "description": "Three things in one plugin: a Notes Board sidebar panel that renders each workspace's .agents/notes decision records (architecture baseline, evolution timeline, pitfalls, decision list, plus the five-section detail drawer); five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that forces every turn touching code to either write a note or explicitly skip; and the bundled write-notes-like-deepseek skill, mounted for the agent."
   }
 }
