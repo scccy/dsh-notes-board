@@ -3,7 +3,7 @@
  *
  * 一个包、一条插件行，拼起三件事：
  *   - 看板半边 src/host/board.js：面板 + /api/dsh-notes-board/* 只读路由，依赖 webServer；
- *   - 笔记半边 src/host/notes.js：5 个原生笔记工具 + turn/end 钩子，依赖 tools；
+ *   - 笔记半边 src/host/notes.js：5 个原生笔记工具 + 结算钩子，依赖 tools；
  *   - 技能半边 src/host/skills.js：把随包的 write-notes-like-deepseek 挂成 agent 技能，
  *     依赖宿主自带的 @deepseek-ai/dsh-skill-filesystem（缺了就静默跳过）。
  *

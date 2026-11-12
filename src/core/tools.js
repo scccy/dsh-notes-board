@@ -175,7 +175,7 @@ export const TOOLS = [
     title: 'Record that no note is needed',
     readOnly: false,
     description:
-      'Record that this turn\'s change needs no Agent Note, so the end-of-turn reminder stops and the ' +
+      'Record that the change needs no Agent Note, so the settlement reminder stops and the ' +
       'reason is on the record. Use it when you already judged that a note is not warranted (typo, rename, ' +
       'formatting, mechanical patch) — give one short reason. This is a statement to the user appended to ' +
       '.agents/notes/.skips.log with a timestamp, not a mute button: never call it to dodge work the change ' +

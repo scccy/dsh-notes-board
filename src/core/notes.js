@@ -1,6 +1,6 @@
 /**
  * Agent Note core — the single source of truth behind the plugin's tools, its
- * turn/end hook and the bundled skill's verifiers. Pure Node, no dependencies.
+ * settlement hook and the bundled skill's verifiers. Pure Node, no dependencies.
  *
  * Structure contract (mirrors vendor/write-notes-like-deepseek scripts):
  *   .agents/notes/{lifecycle}/{class}/yyyy-mm-dd-topic.md

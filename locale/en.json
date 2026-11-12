@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Engineering Decision Notes",
-    "description": "Records engineering decisions as Markdown: every non-trivial change leaves a note under .agents/notes carrying the problem, the decision, the rejected alternatives and the consequences, committed to git and reviewable like code. The plugin makes that happen: five native tools (note_search / note_read / note_write / note_verify / note_skip) with an end-of-turn hook that requires a code-changing turn to write a note or explicitly skip, and the bundled write-notes-like-deepseek skill mounted for the agent. A Notes Board sidebar panel renders those notes; it is the browsing layer, not the point."
+    "description": "Records engineering decisions as Markdown: every non-trivial change leaves a note under .agents/notes carrying the problem, the decision, the rejected alternatives and the consequences, committed to git and reviewable like code. The plugin makes that happen: five native tools (note_search / note_read / note_write / note_verify / note_skip) with a settlement hook that, when your next message arrives, requires the previous turn's code change to carry a note or an explicit skip, and the bundled write-notes-like-deepseek skill mounted for the agent. A Notes Board sidebar panel renders those notes; it is the browsing layer, not the point."
   }
 }

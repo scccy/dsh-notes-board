@@ -4,7 +4,7 @@
 
 这个插件负责让「这件事真的发生」：
 
-- **一个 `turn/end` 钩子**：改过代码的轮次结束时，当场要求二选一——落一篇笔记，或显式 `note_skip` 记一句理由。
+- **一个结算钩子**：你发下一条消息的那一刻，先结算上一轮——改过代码却没交代，就要求二选一：落一篇笔记，或显式 `note_skip` 记一句理由。
 - **五个原生工具**：搜旧决定、读全文、写（写前校验，不合法不落盘）、跑上游三个校验器、记账。
 - **随包的 `write-notes-like-deepseek` 技能**：由插件自己挂给 agent，不用往 `~/.dsh/skills` 手工装。
 
@@ -24,7 +24,7 @@
 
 | 层 | 负责 | 形态 | 确定性 |
 |---|---|---|---|
-| **什么时候必须做决定** | 每轮结束检查：改了代码却没有记录决定 → 当场要求二选一 | DSH `turn/end` 钩子 | 模型选不了，钩子一定跑 |
+| **什么时候必须做决定** | 你发下一条消息时结算上一轮：改了代码却没记录决定 → 要求二选一 | DSH 会话事件钩子（`turn/start` 判上一轮） | 模型选不了，钩子一定跑 |
 | **做什么** | 搜索 / 读 / 写 / 校验 / 记账 | 5 个工具 | 靠 description 引导 |
 
 钩子只保证「必须做决定」，不保证「必须写」——所以出口有两个：`note_write` 和 `note_skip`。只有一个出口的话，改错别字也要立一篇笔记，立刻变噪声。
@@ -51,7 +51,8 @@ NEEDS_SLUG: title has no Latin characters to build a filename from; pass slug wi
 - `tool/call`：
   - 工具名在 `note_write` / `note_skip` 里，或参数/结果里出现 `.agents/notes` → 本轮**已交代**，不再提醒
   - 工具名在 `codeTools` 里（默认 `bash`、`write`、`edit`、`apply_patch` …）且不是只读命令 → 记为**动了代码**
-- `turn/end`：动了代码 **且** 没交代 **且** 本轮没提醒过 **且** 没到 `maxPerSession` → 注入提醒
+- `turn/start`（你发消息那一刻）：**上一轮**动了代码 **且** 没交代 **且** 没提醒过 **且** 没到 `maxPerSession` → 注入提醒
+- `turn/end` 只把这一轮的结果记进 `pending`，不提醒；提醒永远发生在下一条消息到来时
 
 只读命令靠 `readonlyCommandPattern` 排除（`ls`、`cat`、`grep`、`git status/diff/log` …），否则只读排查也会被催。
 
@@ -128,7 +129,7 @@ index.js  ← 组合层：ctx.inject(['webServer']) → applyBoard ；applyNotes
   │           └── 只回 .agents/notes 的 Markdown 原文（zh 优先去重、>64KB gzip）
   │
   ├── src/host/notes.js      笔记半边
-  │     ctx.tools.register × 5  +  ctx.on('session/event') 的 turn/end 钩子
+  │     ctx.tools.register × 5  +  ctx.on('session/event') 的结算钩子
   │        │
   │        ├── src/core/tools.js   5 个工具的唯一定义
   │        └── src/core/notes.js   结构解析、校验、搜索、skip 账本、跑上游校验器
@@ -162,7 +163,7 @@ index.js            插件入口（组合层）
 client.js           客户端生成物（别手改）
 src/panel.js        客户端源：React 薄壳 + shadow root 装原版看板
 src/host/board.js   看板半边：两条只读路由
-src/host/notes.js   笔记半边：5 个原生工具 + turn/end 钩子
+src/host/notes.js   笔记半边：5 个原生工具 + 结算钩子（turn/start 判上一轮）
 src/host/skills.js  技能半边：把随包技能挂成 agent 技能
 src/core/notes.js   结构解析、校验、搜索、skip 账本、跑上游校验器
 src/core/tools.js   5 个工具的唯一定义

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "工程决策笔记",
-    "description": "把每次非平凡改动写成 .agents/notes 下的 Markdown——问题、决定、被否决的备选、后果，进 git、可像代码一样 review。插件让这件事真的发生：note_search / note_read / note_write / note_verify / note_skip 五个原生工具与 turn/end 钩子，改过代码的轮次结束时必须落一篇笔记或显式 skip；随包的 write-notes-like-deepseek 技能由插件自己挂给 agent；另附渲染这些笔记的侧边栏「笔记看板」面板（浏览层，非本体）。"
+    "description": "把每次非平凡改动写成 .agents/notes 下的 Markdown——问题、决定、被否决的备选、后果，进 git、可像代码一样 review。插件让这件事真的发生：note_search / note_read / note_write / note_verify / note_skip 五个原生工具与结算钩子：你发下一条消息时，上一轮若改过代码就必须落一篇笔记或显式 skip；随包的 write-notes-like-deepseek 技能由插件自己挂给 agent；另附渲染这些笔记的侧边栏「笔记看板」面板（浏览层，非本体）。"
   }
 }

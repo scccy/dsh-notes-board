@@ -2,13 +2,14 @@
  * dsh-notes-board · 笔记半边的 Host 代码
  *
  * 由根 index.js 调用（applyNotes），不单独作为插件入口。
- * 提供 5 个原生工具，外加 turn/end 钩子，把"决定必须落库"变成
+ * 提供 5 个原生工具，外加结账钩子，把"决定必须落库"变成
  * 确定性约束。
  *
  * Why the hook exists: a skill and a tool are both "the model may choose
  * to use this". A hook runs whether or not the model feels like it, so the rule
- * "a non-mechanical change must end with note_write or note_skip" is enforced at
- * the point the turn closes, not hoped for at the point it starts.
+ * "a non-mechanical change must end with note_write or note_skip" is enforced
+ * when your next message arrives — the previous turn is settled before this one
+ * starts, not hoped for at the point it starts.
  *
  * Imports host-provided packages (@deepseek-ai/dsh-tools, /dsh-llm, /schemastery)
  * that exist inside the running Harness, not in this package's node_modules.
@@ -32,11 +33,11 @@ export const NotesConfig = z.object({
   root: z.string().description('Workspace root holding .agents/notes. Defaults to the agent working directory, then process.cwd().'),
   reminder: z
     .object({
-      enabled: z.boolean().default(true).description('Fire the end-of-turn reminder at all.'),
-      wake: z.boolean().default(false).description('Also call agent.followup() so the agent acts immediately instead of waiting for the next user message.'),
+      enabled: z.boolean().default(true).description('Fire the reminder at all. It is checked when your next message arrives, about the turn before it.'),
+      wake: z.boolean().default(false).description('Also call agent.followup() so the agent acts immediately in the new turn instead of only seeing the note in its inbox.'),
       maxPerSession: z.number().default(6).description('Stop reminding after this many reminders in one session; the reminder is a nudge, not a loop.'),
     })
-    .description('End-of-turn reminder behavior.'),
+    .description('Previous-turn reminder behavior.'),
   codeTools: z.array(z.string()).default(DEFAULT_CODE_TOOLS).description('Tool names whose use counts as changing the workspace.'),
   readonlyCommandPattern: z.string().default(DEFAULT_READONLY_CMD).description('A bash command matching this is treated as read-only and does not trigger a reminder.'),
 })
@@ -176,14 +177,14 @@ export function applyNotes(ctx, config = {}) {
       )
     }
 
-    // ---- turn/end hook ---------------------------------------------------
+    // ---- 结账钩子（turn/start 判上一轮）---------------------------------
     const sessions = new Map()
 
     const stateFor = (session) => {
       const id = session?.id ?? 'unknown'
       let st = sessions.get(id)
       if (!st) {
-        st = { turn: 0, touched: [], discharged: false, remCount: 0, lastTurn: 0 }
+        st = { turn: 0, touched: [], discharged: false, remCount: 0, pending: null, remindedTurn: 0 }
         sessions.set(id, st)
       }
       return st
@@ -195,15 +196,45 @@ export function applyNotes(ctx, config = {}) {
       agents.set(agent.id, agent)
     })
 
+    /* 结账的时机是「用户发下一条消息那一刻」，不是上一轮结束时。
+       turn/end 只是把这一轮的结果存进 pending，等下一次 turn/start 先算上一轮的账，
+       再重置本轮状态。这样提醒的触发点可观察、可测试，也不依赖宿主怎么投递 inject。 */
+    const settle = (session, st, prev) => {
+      if (!prev) return
+      if (!cfg.reminder.enabled) return
+      if (prev.discharged) return
+      if (prev.touched.length === 0) return
+      if (st.remCount >= cfg.reminder.maxPerSession) return
+      if (st.remindedTurn === prev.turn) return
+      st.remindedTurn = prev.turn
+      st.remCount += 1
+
+      const agent = session?.id !== undefined ? agents.get(session.id) : undefined
+      const text = buildReminder({ touched: prev.touched, turn: prev.turn, root: rootOf(agent) })
+      try {
+        if (typeof agent?.inject === 'function') {
+          agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: SOURCE_KIND } }))
+        } else {
+          ctx.logger?.info?.(`agent-notes: reminder not delivered (no agent handle): ${prev.touched.join(', ')}`)
+        }
+        if (cfg.reminder.wake && typeof agent?.followup === 'function') agent.followup()
+      } catch (error) {
+        ctx.logger?.warn?.(`agent-notes: reminder inject failed: ${String(error)}`)
+      }
+    }
+
     ctx.on('session/event', (session, event) => {
       if (!event || typeof event.type !== 'string') return
       const st = stateFor(session)
       const data = event.data
 
       if (event.type === 'turn/start') {
+        const prev = st.pending
+        st.pending = null
         st.turn = Number(data?.turn ?? st.turn + 1)
         st.touched = []
         st.discharged = false
+        settle(session, st, prev)
         return
       }
 
@@ -228,27 +259,8 @@ export function applyNotes(ctx, config = {}) {
       }
 
       if (event.type === 'turn/end') {
-        if (!cfg.reminder.enabled) return
-        if (st.discharged) return
-        if (st.touched.length === 0) return
-        if (st.remCount >= cfg.reminder.maxPerSession) return
-        if (st.lastTurn === st.turn) return
-        st.lastTurn = st.turn
-        st.remCount += 1
-
-        const root = rootOf(sessions.has(session?.id) ? agents.get(session?.id) : undefined)
-        const text = buildReminder({ touched: st.touched, turn: st.turn, root })
-        const agent = session?.id !== undefined ? agents.get(session.id) : undefined
-        try {
-          if (typeof agent?.inject === 'function') {
-            agent.inject(createUserMessage({ content: [{ type: 'text', text }], source: { kind: SOURCE_KIND } }))
-          } else {
-            ctx.logger?.info?.(`agent-notes: reminder not delivered (no agent handle): ${st.touched.join(', ')}`)
-          }
-          if (cfg.reminder.wake && typeof agent?.followup === 'function') agent.followup()
-        } catch (error) {
-          ctx.logger?.warn?.(`agent-notes: reminder inject failed: ${String(error)}`)
-        }
+        st.pending = { turn: st.turn, touched: [...st.touched], discharged: st.discharged }
+        return
       }
     })
   }
@@ -260,10 +272,10 @@ export function applyNotes(ctx, config = {}) {
 function buildReminder({ touched, turn, root }) {
   const sample = touched.slice(0, 3).join(', ')
   return [
-    'Agent Notes · 本轮改了代码，但没有记录决定。',
-    `Turn ${turn} 动了：${sample}${touched.length > 3 ? ` 等 ${touched.length} 处` : ''}`,
+    'Agent Notes · 上一轮改了代码，但没有记录决定。',
+    `上一轮（Turn ${turn}）动了：${sample}${touched.length > 3 ? ` 等 ${touched.length} 处` : ''}`,
     '',
-    '现在二选一（这是 end-of-turn 检查，不是建议）：',
+    '现在二选一（这是你发下一条消息时触发的结算，不是建议）：',
     '- note_write(lifecycle="implemented"|"proposed", class="feature|bug-fix|simplification|architecture|process|testing",',
     '             title="<具体标题>", body="## Problem ... ## Decision ... ## Alternatives considered ...")',
     '  → 行为/架构/跨文件契约/流程/测试策略发生了非机械变化，或需要推翻旧决定（新开一篇并互链）。',
@@ -271,6 +283,6 @@ function buildReminder({ touched, turn, root }) {
     '  → 纯机械改动（错别字/改名/格式化/依赖升级）。',
     '',
     `笔记根目录：${join(root ?? process.cwd(), '.agents/notes')}`,
-    '本轮已经 note_write 或 note_skip 过的话，忽略这条。',
+    '那一轮已经 note_write 或 note_skip 过的话，忽略这条。',
   ].join('\n')
 }

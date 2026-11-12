@@ -1,7 +1,7 @@
 /**
  * Entry + hook logic test: loads the merged plugin entry against stubbed host
  * packages, asserts it mounts both halves, then replays session events to check
- * when the end-of-turn reminder fires.
+ * that the reminder settles the previous turn when the next message arrives.
  * Run: node --import ./test/stubs/register.mjs test/dsh-plugin.mjs
  */
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
@@ -109,50 +109,55 @@ const emit = (session, type, data) => {
   handlers.get('session/event')({ id: session }, { type, data })
 }
 
-// A: code change without a note -> reminder
+// A: 改了代码没记账 → 不在这里提醒，等**下一条消息**（turn/start）才结算上一轮
 emit('s1', 'turn/start', { turn: 1 })
 emit('s1', 'tool/call', { name: 'bash', args: { command: 'git commit -am "feat: x"' } })
 emit('s1', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
-check('reminds when code changed without a note', injected.length === 1)
-check('reminder names both outlets', /note_write/.test(injected[0]?.content[0].text ?? '') && /note_skip/.test(injected[0]?.content[0].text ?? ''))
-check('reminder carries turn + touched file', /Turn 1/.test(injected[0]?.content[0].text ?? ''))
+check('turn/end alone does not remind (settlement happens on the next message)', injected.length === 0)
 
-// B: same session, note_write discharges
 emit('s1', 'turn/start', { turn: 2 })
+check('next message settles the previous turn and reminds', injected.length === 1)
+check('reminder names both outlets', /note_write/.test(injected[0]?.content[0].text ?? '') && /note_skip/.test(injected[0]?.content[0].text ?? ''))
+check('reminder carries the previous turn number + touched file', /上一轮（Turn 1）/.test(injected[0]?.content[0].text ?? ''))
+
+// B: 同一会话，note_write 记账后不再提醒
 emit('s1', 'tool/call', { name: 'edit', args: { path: 'src/a.js' } })
 emit('s1', 'tool/call', { name: 'note_write', args: { title: 'x' } })
 emit('s1', 'turn/end', { turn: 2 })
+emit('s1', 'turn/start', { turn: 3 })
 check('note_write suppresses the reminder', injected.length === 1)
 
-// C: read-only commands never remind
-emit('s1', 'turn/start', { turn: 3 })
+// C: 只读命令从不提醒
 emit('s1', 'tool/call', { name: 'bash', args: { command: 'ls -la && git status' } })
 emit('s1', 'turn/end', { turn: 3 })
+emit('s1', 'turn/start', { turn: 4 })
 check('read-only bash does not remind', injected.length === 1)
 
-// D: note_skip suppresses
-emit('s1', 'turn/start', { turn: 4 })
+// D: note_skip 抑制
 emit('s1', 'tool/call', { name: 'write', args: { path: 'README.md' } })
 emit('s1', 'tool/call', { name: 'note_skip', args: { reason: 'typo only' } })
 emit('s1', 'turn/end', { turn: 4 })
+emit('s1', 'turn/start', { turn: 5 })
 check('note_skip suppresses the reminder', injected.length === 1)
 
-// E: no work -> no reminder
+// E: 空转轮不提醒
 emit('s2', 'turn/start', { turn: 1 })
 emit('s2', 'turn/end', { turn: 1 })
+emit('s2', 'turn/start', { turn: 2 })
 check('idle turn does not remind', injected.length === 1)
 
-// F: sessions are independent
+// F: 会话之间互不影响
 emit('s3', 'turn/start', { turn: 1 })
 emit('s3', 'tool/call', { name: 'edit', args: { path: 'src/b.js' } })
 emit('s3', 'turn/end', { turn: 1 })
+emit('s3', 'turn/start', { turn: 2 })
 check('second session reminds independently', injected.length === 2)
 
-// G: cap
+// G: 每会话封顶
 for (let t = 2; t <= 12; t++) {
-  emit('s3', 'turn/start', { turn: t })
   emit('s3', 'tool/call', { name: 'edit', args: { path: 'src/b.js' } })
   emit('s3', 'turn/end', { turn: t })
+  emit('s3', 'turn/start', { turn: t + 1 })
 }
 check('stops after maxPerSession', injected.length === 2 + 5)
 
